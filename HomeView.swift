@@ -5,103 +5,122 @@
 //  Created by Eric Cheyne on 10/9/24.
 //
 
-// HomeView.swift
-
 import SwiftUI
+import PDFKit
 
 struct HomeView: View {
-    @State private var isVisible = false // Controls visibility for animations
-    @State private var isVisibleText = false
-    @State private var isProfileExpanded = false
+    @State private var isVisible = false
+    @State private var showResume = false // State to control full-screen PDF presentation
 
     var body: some View {
         GeometryReader { geometry in
             ZStack {
-                // Gradient background for a polished look
-                LinearGradient(
-                    gradient: Gradient(colors: [Color.blue.opacity(0.5), Color.purple.opacity(0.5)]),
-                    startPoint: .topLeading,
-                    endPoint: .bottomTrailing
-                )
-                .edgesIgnoringSafeArea(.all)
+                // System background color (adapts to dark and light mode)
+                Color(uiColor: .systemBackground)
+                    .edgesIgnoringSafeArea(.all)
 
                 VStack {
-                    // Profile Image with bounce and glow effect
-                    ZStack {
-                        Circle()
-                            .stroke(Color.purple, lineWidth: 4)
-                            .scaleEffect(isVisible ? 1.1 : 0.9)
-                            .opacity(isVisible ? 0.5 : 0)
-                            .animation(.easeInOut(duration: 1.5).repeatForever(autoreverses: true), value: isVisible)
-
-                        Image("profileImage")
-                            .resizable()
-                            .scaledToFit()
-                            .frame(width: isProfileExpanded ? 200 : geometry.size.width * 0.4)
-                            .clipShape(Circle())
-                            .shadow(radius: 10)
-                            .scaleEffect(isVisible ? 1 : 0.8)
-                            .opacity(isVisible ? 1 : 0)
-                            .animation(.spring(response: 0.5, dampingFraction: 0.6), value: isVisible)
-                            .onTapGesture {
-                                withAnimation(.spring()) {
-                                    isProfileExpanded.toggle()
-                                }
-                            }
-                    }
-                    .padding(.bottom, 20)
-
-                    // Name Text with fade and slide-in transition
+                    Image("profileImage")
+                        .resizable()
+                        .scaledToFit()
+                        .frame(width: geometry.size.width * 0.4)
+                        .clipShape(Circle())
+                        .shadow(radius: 10)
+                        .scaleEffect(isVisible ? 1 : 0.8) // Slight scaling for a bounce effect
+                        .opacity(isVisible ? 1 : 0)
+                        .animation(
+                            Animation.timingCurve(0.5, 0.1, 0.8, 1.0, duration: 1.0), // Custom easing curve
+                            value: isVisible
+                        )
+                    
                     Text("Hello, I'm Eric Cheyne")
                         .font(.system(size: 28, weight: .bold))
-                        .foregroundColor(.primary)
+                        .foregroundColor(Color(uiColor: .label)) // Adaptive text color for dark/light mode
                         .padding(.bottom, 8)
-                        .transition(.move(edge: .leading).combined(with: .opacity))
-                        .opacity(isVisibleText ? 1 : 0)
-                        .animation(.easeIn(duration: 1.0).delay(0.5), value: isVisibleText)
+                        .transition(.move(edge: .leading).combined(with: .opacity)) // Slide-in from left + fade
+                        .opacity(isVisible ? 1 : 0)
+                        .animation(.easeIn(duration: 1.0).delay(0.5), value: isVisible)
 
-                    // Subheading Text with subtle delay for smooth staggered effect
                     Text("iOS Developer | Web Developer | Data Science")
                         .font(.subheadline)
-                        .foregroundColor(.secondary)
+                        .foregroundColor(Color(uiColor: .secondaryLabel)) // Adaptive color
                         .padding(.bottom, 40)
-                        .opacity(isVisibleText ? 1 : 0)
-                        .animation(.easeIn(duration: 1.0).delay(1.0), value: isVisibleText)
+                        .opacity(isVisible ? 1 : 0)
+                        .animation(.easeIn(duration: 1.0).delay(1.0), value: isVisible)
 
-                    // Button with gradient background, scale effect, and tap interaction
                     Button(action: {
-                        // Resume action
+                        // Show the PDF resume in full screen
+                        showResume = true
                     }) {
                         HStack {
                             Image(systemName: "arrow.down.doc.fill")
                             Text("View Resume")
-                                .fontWeight(.semibold)
                         }
                         .padding()
-                        .background(
-                            LinearGradient(gradient: Gradient(colors: [Color.blue, Color.purple]),
-                                           startPoint: .topLeading,
-                                           endPoint: .bottomTrailing)
-                        )
+                        .background(LinearGradient(
+                            gradient: Gradient(colors: [Color.blue, Color.purple]),
+                            startPoint: .topLeading,
+                            endPoint: .bottomTrailing
+                        ))
                         .foregroundColor(.white)
                         .cornerRadius(10)
+                        .rotationEffect(isVisible ? .degrees(0) : .degrees(-90)) // Button rotates into view
                         .shadow(radius: 5)
-                        .scaleEffect(isVisible ? 1 : 0.95)
-                        .animation(.easeIn(duration: 1.0).delay(1.5), value: isVisible)
                     }
-                    .buttonStyle(PlainButtonStyle()) // Ensures consistent look across platforms
+                    .scaleEffect(isVisible ? 1 : 0.95)
+                    .opacity(isVisible ? 1 : 0)
+                    .animation(.easeIn(duration: 1.0).delay(1.5), value: isVisible)
                 }
                 .padding()
                 .onAppear {
-                    withAnimation {
-                        isVisible = true
-                        isVisibleText = true
-                    }
+                    isVisible = true
                 }
+                .fullScreenCover(isPresented: $showResume) {
+                    PDFViewer()
+                } // Present the PDFViewer in full screen
             }
         }
     }
 }
+
+// PDFViewer to display the PDF file in full screen
+struct PDFViewer: View {
+    @Environment(\.presentationMode) var presentationMode // To dismiss the view
+    
+    var body: some View {
+        NavigationView {
+            PDFKitView(fileName: "resume") // Name of the PDF file
+                .edgesIgnoringSafeArea(.all) // Ensure the PDF view uses the full screen
+                .navigationBarItems(trailing: Button("Done") {
+                    presentationMode.wrappedValue.dismiss() // Dismiss the PDF view
+                })
+                .navigationBarTitle("Resume", displayMode: .inline) // Add a title to the navigation bar
+        }
+    }
+}
+
+// PDFKitView to render the PDF using PDFKit
+struct PDFKitView: UIViewRepresentable {
+    let fileName: String
+
+    func makeUIView(context: Context) -> PDFView {
+        let pdfView = PDFView()
+
+        if let url = Bundle.main.url(forResource: fileName, withExtension: "pdf") {
+            if let document = PDFDocument(url: url) {
+                pdfView.document = document
+            }
+        }
+
+        pdfView.autoScales = true // Auto-scale to fit the screen
+        return pdfView
+    }
+
+    func updateUIView(_ uiView: PDFView, context: Context) {
+        // No updates needed for now
+    }
+}
+
 
 
 struct HomeView_Previews: PreviewProvider {
